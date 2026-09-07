@@ -50,6 +50,7 @@ gdi update <deployment-id> [--ref <branch>] [--json]
 gdi destroy <deployment-id> [--json]
 gdi status [deployment-id] [--json]
 gdi list [--json]
+gdi urls [--all] [--json]
 gdi cleanup [--json]
 gdi logs <deployment-id> [--full]
 gdi healthcheck <deployment-id> [--json]
@@ -63,7 +64,8 @@ gdi healthcheck <deployment-id> [--json]
 | "Preview design/a, design/b, design/c for 3 days." | `gdi preview design/a design/b design/c --ttl 3d` |
 | "Give me previews for all design/* branches." | Enumerate matching local/remote branches yourself (e.g. `git branch -r | grep design/`), then call `gdi preview` with the resolved list. Confirm the branch list with the user first if it's large or ambiguous. |
 | "Redeploy the modern design." | Find the matching deployment via `gdi list --json` (match on `source.ref` or repository name), then `gdi update <id>`. |
-| "Show me all active previews." | `gdi status` (all) or `gdi list` (everything, including expired/destroyed). |
+| "Show me all active previews." | `gdi status` (tree view with per-branch expiry) or `gdi urls` (flat list of just the links) — pick based on whether they want status detail or just URLs to share. `gdi list` shows everything, including expired/destroyed, with more per-row detail than either. |
+| "Give me a list of all the deployment URLs." | `gdi urls`. Add `--all` if they also want failed/expiring/destroyed ones, not just active. This is the direct answer to "what are all my live links right now" — don't hand-build this list yourself from `gdi list` output when this command exists. |
 | "Delete the editorial preview." | Resolve the ID via `gdi list --json`, confirm with the user which one you mean if there's ambiguity, then `gdi destroy <id>`. This is destructive — see Safety rules. |
 | "Clean up expired deployments." | `gdi cleanup`. This only ever touches already-expired, managed deployments — safe to run without extra confirmation. |
 | "Create a client preview dashboard for these five branches." | `gdi preview <branches...> --dashboard --dashboard-out <path>`, then tell the user where the HTML file is (or offer to publish it). |
@@ -110,6 +112,7 @@ deployment ("this reused the existing preview at the same URL — pass
 
 - `gdi preview ... --json` returns `{ deployments: [{ branch, repository, status, url, expires_at, error }] }`.
 - `gdi status --json` (single ID) returns `{ deployment, live: { workflowStatus, workflowConclusion, pagesUrl, health } }`.
+- `gdi urls --json` returns `{ urls: [{ id, branch, status, url }] }` — active deployments only unless `--all` was passed.
 - Exit codes distinguish failure classes: `2` config, `3` auth, `4` provider, `5` build, `6` healthcheck, `7` cleanup. Use these to decide whether to suggest a config fix vs. a re-auth vs. inspecting build logs.
 
 ## Automatic cleanup (independent of you)
