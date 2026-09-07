@@ -1,0 +1,11 @@
+name: example-vite-app
+github:
+  deployment_owner: surdic-deployments
+defaults:
+  ttl: 3d
+repository:
+  prefix: example-vite-app
+build:
+  framework: auto
+preview:
+  healthcheck: /

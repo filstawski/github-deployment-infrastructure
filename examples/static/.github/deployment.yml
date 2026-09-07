@@ -1,0 +1,11 @@
+name: example-static-site
+github:
+  deployment_owner: surdic-deployments
+defaults:
+  ttl: 3d
+repository:
+  prefix: example-static-site
+build:
+  framework: STATIC
+preview:
+  healthcheck: /

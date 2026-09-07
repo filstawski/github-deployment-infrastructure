@@ -1,0 +1,35 @@
+name: GDI scheduled cleanup
+
+# Runs independently of Claude or any developer machine (spec section 16).
+# Install this workflow in the SOURCE project repository (the one that
+# contains .github/deployment.yml), not in the disposable deployment
+# repositories themselves.
+
+on:
+  schedule:
+    # Default: every 3 hours. Adjust to taste; the effective policy is
+    # still governed by cleanup.grace_period / cleanup.maximum_ttl in
+    # .github/deployment.yml.
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install github-deployment-infrastructure
+        run: npm install --no-save github-deployment-infrastructure
+
+      - name: Run cleanup
+        env:
+          GITHUB_TOKEN: ${{ secrets.GDI_GITHUB_TOKEN }}
+        run: npx gdi cleanup

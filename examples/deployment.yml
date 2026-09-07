@@ -1,0 +1,70 @@
+# .github/deployment.yml
+#
+# Project-local, optional configuration for github-deployment-infrastructure
+# (gdi). Copy this into your project as .github/deployment.yml and adjust
+# the values below. Only `github.deployment_owner` is required — everything
+# else has a sensible default.
+
+# Human-readable project name. Optional — derived from the repository
+# directory name when omitted.
+name: portfolio
+
+# Deployment provider. Only "github-pages" is implemented today; the
+# architecture supports adding others (vercel, cloudflare-pages, ...)
+# without changing this file's shape.
+provider: github-pages
+
+github:
+  # REQUIRED. The GitHub user or organization that disposable preview
+  # repositories are created under. This should usually be a dedicated
+  # namespace (e.g. "your-org-deployments"), never your main org, so that
+  # ephemeral repos are visually and permission-wise separated from real
+  # projects.
+  deployment_owner: surdic-deployments
+
+defaults:
+  # Default time-to-live for a deployment when --ttl isn't passed.
+  # Accepts values like "30m", "6h", "3d", "2w".
+  ttl: 3d
+
+repository:
+  # Prefix used when naming disposable deployment repositories, e.g.
+  # "portfolio-design-modern-a83f21". Defaults to `name`.
+  prefix: portfolio
+
+build:
+  # "auto" inspects the project (package.json, vite.config.*, astro.config.*,
+  # next.config.*, nuxt.config.*, angular.json, index.html) to pick a
+  # framework. Set explicitly (STATIC | VITE | ASTRO | NEXT_STATIC |
+  # NUXT_STATIC | GENERIC) to skip detection or to support an unrecognized
+  # setup.
+  framework: auto
+  # Override the build command / output directory. Leave unset to use the
+  # framework's conventional defaults (e.g. Vite -> "npm run build" / "dist").
+  # command: npm run build
+  # output: dist
+
+preview:
+  # Path checked after deployment to decide whether the preview is healthy.
+  # Resolved relative to the deployed site's own base path
+  # (https://OWNER.github.io/REPOSITORY/<healthcheck>), not the domain root.
+  healthcheck: /
+  timeout: 10s
+  retries: 10
+  retry_delay: 5s
+  # expected_status: [200]
+
+cleanup:
+  enabled: true
+  default_ttl: 3d
+  # Hard upper bound — requests for a longer TTL are clamped, never granted,
+  # so this system can't accidentally become permanent hosting.
+  maximum_ttl: 14d
+  grace_period: 6h
+  require_managed_marker: true
+  # Cron schedule for the cleanup GitHub Action (see .github/workflows/cleanup.yml).
+  schedule_cron: "0 */3 * * *"
+
+concurrency:
+  # Cap on simultaneous deployments when previewing many branches at once.
+  max_parallel_deployments: 4

@@ -1,0 +1,30 @@
+{
+  "name": "github-deployment-infrastructure",
+  "version": "0.1.0",
+  "description": "Reusable ephemeral preview deployment platform, primarily backed by GitHub Pages.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "gdi": "./bin/gdi.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.2",
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
