@@ -1,4 +1,5 @@
 import type { BuildConfig, Framework } from "../../core/types.js";
+import { installCommand, runScript, type PackageManager } from "../../framework/package-manager.js";
 
 export interface WorkflowContext {
   build: Required<Pick<BuildConfig, "command" | "output">>;
@@ -6,8 +7,14 @@ export interface WorkflowContext {
   /** The repository name the site will be served under: https://OWNER.github.io/REPO/ */
   repositoryName: string;
   nodeVersion?: string;
-  /** Whether a package manager lockfile is present — actions/setup-node's cache option fails outright without one. */
-  hasLockfile: boolean;
+  /**
+   * The detected package manager, or "none" when no lockfile is present.
+   * actions/setup-node's cache option must match the actual lockfile type —
+   * "npm" cannot read pnpm-lock.yaml/yarn.lock, so this drives both the
+   * cache option and (for pnpm) an extra pnpm/action-setup step that must
+   * run before actions/setup-node.
+   */
+  packageManager: PackageManager;
 }
 
 /** Frameworks that are typically SPAs and benefit from a 404.html fallback for client-side routing. */
@@ -22,8 +29,14 @@ const SPA_FALLBACK_FRAMEWORKS: Framework[] = ["STATIC", "VITE", "GENERIC"];
  * swap the `uses:` lines for the SHA of the same tag.
  */
 export function generatePagesWorkflow(ctx: WorkflowContext): string {
-  const nodeVersion = ctx.nodeVersion ?? "20";
+  // Node 20 is EOL/deprecated on GitHub-hosted runners, and modern pnpm
+  // releases (pnpm/action-setup with no pinned version resolves whatever a
+  // project's package.json#packageManager pins) commonly require Node
+  // >=22.13 — using it as the default silently breaks pnpm projects with a
+  // Node-internal error, not a clear "unsupported Node version" message.
+  const nodeVersion = ctx.nodeVersion ?? "22";
   const hasBuildStep = ctx.build.command && ctx.build.command !== "true";
+  const pm = ctx.packageManager;
 
   // Vite supports overriding the base path via a CLI flag, so we can inject
   // the GitHub Pages project-site base path (spec section 13) without
@@ -31,21 +44,34 @@ export function generatePagesWorkflow(ctx: WorkflowContext): string {
   // Next static export, Nuxt) require base/site config in their own config
   // files; PAGES_BASE_PATH is exported as an env var so those config files
   // can read it (documented in README "GitHub Pages limitations").
+  const conventionalBuildCommand = runScript(pm, "build");
   const buildCommand =
-    ctx.framework === "VITE" && ctx.build.command === "npm run build"
-      ? `npm run build -- --base="$PAGES_BASE_PATH"`
+    ctx.framework === "VITE" && ctx.build.command === conventionalBuildCommand
+      ? `${conventionalBuildCommand} -- --base="$PAGES_BASE_PATH"`
       : ctx.build.command;
 
-  const cacheLine = ctx.hasLockfile ? "\n          cache: npm" : "";
+  // actions/setup-node's built-in cache option only understands npm/yarn's
+  // own lockfiles; pnpm requires pnpm itself to be on PATH *before*
+  // actions/setup-node runs (via pnpm/action-setup), at which point
+  // `cache: pnpm` works. "none" omits the cache option entirely — enabling
+  // it with no lockfile hard-fails the run rather than degrading gracefully.
+  const pnpmSetupStep =
+    pm === "pnpm"
+      ? `      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+`
+      : "";
+  const cacheLine = pm === "pnpm" || pm === "yarn" || pm === "npm" ? `\n          cache: ${pm}` : "";
 
   const buildSteps = hasBuildStep
-    ? `      - name: Set up Node.js
+    ? `${pnpmSetupStep}      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "${nodeVersion}"${cacheLine}
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: ${installCommand(pm)}
 
       - name: Build
         env:

@@ -1,6 +1,4 @@
 import type { Octokit } from "@octokit/rest";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import {
   createOctokit,
   createRepository,
@@ -21,6 +19,7 @@ import { generatePagesWorkflow } from "./workflow-templates.js";
 import { buildManagedTopics, buildRepoDescription, isManagedRepository } from "../../security/managed.js";
 import { checkHealth } from "../../health/healthcheck.js";
 import { detectFramework } from "../../framework/detect.js";
+import { detectPackageManager, runScript } from "../../framework/package-manager.js";
 import { generateDeploymentId } from "../../core/id.js";
 import { computeExpiry } from "../../core/ttl.js";
 import { BuildError, DeployFailedError, ExitCode, GdiError, ProviderError } from "../../core/errors.js";
@@ -115,9 +114,10 @@ export class GitHubPagesProvider implements DeploymentProvider {
     deployment.status = "building";
     const source = fetchSourceRef(deployment.source.repository, ref, this.token);
     try {
+      const packageManager = detectPackageManager(source.dir);
       const detection =
         build.framework && build.framework !== "auto"
-          ? { framework: build.framework, buildCommand: build.command ?? "npm run build", buildOutput: build.output ?? "dist", reason: "explicit config" }
+          ? { framework: build.framework, buildCommand: build.command ?? runScript(packageManager, "build"), buildOutput: build.output ?? "dist", reason: "explicit config" }
           : (() => {
               try {
                 return detectFramework(source.dir);
@@ -137,15 +137,11 @@ export class GitHubPagesProvider implements DeploymentProvider {
       deployment.metadata.buildCommand = buildCommand;
       deployment.metadata.buildOutput = buildOutput;
 
-      const hasLockfile = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"].some((f) =>
-        existsSync(join(source.dir, f))
-      );
-
       const workflowYaml = generatePagesWorkflow({
         build: { command: buildCommand, output: buildOutput },
         framework: detection.framework,
         repositoryName: deployment.target.repository,
-        hasLockfile,
+        packageManager,
       });
 
       const content = prepareDeploymentContent(source.dir, workflowYaml, {

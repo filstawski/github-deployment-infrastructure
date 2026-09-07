@@ -9,7 +9,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "npm run build", output: "dist" },
       framework: "VITE",
       repositoryName: "portfolio-a83f21",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     const parsed = yaml.load(yamlText) as any;
     expect(parsed.name).toBeTruthy();
@@ -22,7 +22,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "npm run build", output: "dist" },
       framework: "VITE",
       repositoryName: "portfolio-a83f21",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     expect(yamlText).toContain("actions/checkout@v4");
     expect(yamlText).toContain("actions/configure-pages@v5");
@@ -35,7 +35,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "npm run build", output: "dist" },
       framework: "VITE",
       repositoryName: "my-repo",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     expect(yamlText).toContain('npm run build -- --base="$PAGES_BASE_PATH"');
   });
@@ -45,7 +45,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "pnpm build:preview", output: "dist" },
       framework: "VITE",
       repositoryName: "my-repo",
-      hasLockfile: true,
+      packageManager: "pnpm",
     });
     expect(yamlText).toContain("pnpm build:preview");
     expect(yamlText).not.toContain("--base=");
@@ -56,7 +56,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "npm run build", output: "dist" },
       framework: "STATIC",
       repositoryName: "my-repo",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     expect(yamlText).toContain("404.html");
   });
@@ -66,7 +66,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "npm run build", output: "dist" },
       framework: "ASTRO",
       repositoryName: "my-repo",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     expect(yamlText).not.toContain("404.html");
   });
@@ -76,7 +76,7 @@ describe("generatePagesWorkflow", () => {
       build: { command: "true", output: "." },
       framework: "STATIC",
       repositoryName: "my-repo",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     expect(yamlText).not.toContain("actions/setup-node");
   });
@@ -86,20 +86,72 @@ describe("generatePagesWorkflow", () => {
       build: { command: "npm run build", output: "dist" },
       framework: "VITE",
       repositoryName: "my-repo",
-      hasLockfile: false,
+      packageManager: "none",
     });
     expect(yamlText).toContain("actions/setup-node");
     expect(yamlText).not.toContain("cache: npm");
+    expect(yamlText).not.toContain("cache: pnpm");
+    expect(yamlText).not.toContain("cache: yarn");
   });
 
-  it("enables setup-node's npm cache when a lockfile is present", () => {
+  it("enables setup-node's npm cache and uses npm ci when npm's lockfile is present", () => {
     const yamlText = generatePagesWorkflow({
       build: { command: "npm run build", output: "dist" },
       framework: "VITE",
       repositoryName: "my-repo",
-      hasLockfile: true,
+      packageManager: "npm",
     });
     expect(yamlText).toContain("cache: npm");
+    expect(yamlText).toContain("npm ci || npm install");
+    expect(yamlText).not.toContain("pnpm/action-setup");
+  });
+
+  it("uses pnpm/action-setup, cache: pnpm, and a frozen-lockfile install for pnpm projects", () => {
+    const yamlText = generatePagesWorkflow({
+      build: { command: "pnpm run build", output: "dist" },
+      framework: "VITE",
+      repositoryName: "my-repo",
+      packageManager: "pnpm",
+    });
+    expect(yamlText).toContain("pnpm/action-setup@v4");
+    expect(yamlText).toContain("cache: pnpm");
+    expect(yamlText).toContain("pnpm install --frozen-lockfile || pnpm install");
+    // pnpm/action-setup must run before actions/setup-node, or setup-node's
+    // `cache: pnpm` has nothing to invoke to resolve the cache key.
+    expect(yamlText.indexOf("pnpm/action-setup")).toBeLessThan(yamlText.indexOf("actions/setup-node"));
+  });
+
+  it("defaults to a Node version new enough for modern pnpm (>=22.13), not the deprecated Node 20", () => {
+    const yamlText = generatePagesWorkflow({
+      build: { command: "pnpm run build", output: "dist" },
+      framework: "VITE",
+      repositoryName: "my-repo",
+      packageManager: "pnpm",
+    });
+    expect(yamlText).not.toContain('node-version: "20"');
+    expect(yamlText).toContain('node-version: "22"');
+  });
+
+  it("uses cache: yarn and a frozen-lockfile install for yarn projects", () => {
+    const yamlText = generatePagesWorkflow({
+      build: { command: "yarn build", output: "dist" },
+      framework: "VITE",
+      repositoryName: "my-repo",
+      packageManager: "yarn",
+    });
+    expect(yamlText).toContain("cache: yarn");
+    expect(yamlText).toContain("yarn install --frozen-lockfile || yarn install");
+    expect(yamlText).not.toContain("pnpm/action-setup");
+  });
+
+  it("injects the CLI --base flag for the default pnpm Vite build command too", () => {
+    const yamlText = generatePagesWorkflow({
+      build: { command: "pnpm run build", output: "dist" },
+      framework: "VITE",
+      repositoryName: "my-repo",
+      packageManager: "pnpm",
+    });
+    expect(yamlText).toContain('pnpm run build -- --base="$PAGES_BASE_PATH"');
   });
 });
 

@@ -2,12 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ConfigError } from "../core/errors.js";
 import type { Framework } from "../core/types.js";
+import { detectPackageManager, runScript, type PackageManager } from "./package-manager.js";
 
 export interface FrameworkDetectionResult {
   framework: Framework;
   buildCommand: string;
   buildOutput: string;
   reason: string;
+  packageManager: PackageManager;
 }
 
 function hasAny(dir: string, files: string[]): string | undefined {
@@ -33,6 +35,7 @@ function readPackageJson(dir: string): Record<string, any> | undefined {
 export function detectFramework(dir: string): FrameworkDetectionResult {
   const pkg = readPackageJson(dir);
   const deps = { ...(pkg?.dependencies ?? {}), ...(pkg?.devDependencies ?? {}) };
+  const packageManager = detectPackageManager(dir);
 
   const nextConfig = hasAny(dir, ["next.config.js", "next.config.mjs", "next.config.ts"]);
   const nuxtConfig = hasAny(dir, ["nuxt.config.js", "nuxt.config.ts"]);
@@ -55,36 +58,40 @@ export function detectFramework(dir: string): FrameworkDetectionResult {
     }
     return {
       framework: "NEXT_STATIC",
-      buildCommand: "npm run build",
+      buildCommand: runScript(packageManager, "build"),
       buildOutput: "out",
       reason: `next.config with output: "export" found`,
+      packageManager,
     };
   }
 
   if (nuxtConfig || deps.nuxt) {
     return {
       framework: "NUXT_STATIC",
-      buildCommand: "npm run generate",
+      buildCommand: runScript(packageManager, "generate"),
       buildOutput: "dist",
       reason: "nuxt.config detected (using `nuxt generate` for static output)",
+      packageManager,
     };
   }
 
   if (astroConfig || deps.astro) {
     return {
       framework: "ASTRO",
-      buildCommand: "npm run build",
+      buildCommand: runScript(packageManager, "build"),
       buildOutput: "dist",
       reason: "astro.config detected",
+      packageManager,
     };
   }
 
   if (viteConfig || deps.vite) {
     return {
       framework: "VITE",
-      buildCommand: "npm run build",
+      buildCommand: runScript(packageManager, "build"),
       buildOutput: "dist",
       reason: "vite.config detected",
+      packageManager,
     };
   }
 
@@ -100,15 +107,17 @@ export function detectFramework(dir: string): FrameworkDetectionResult {
       buildCommand: "true",
       buildOutput: ".",
       reason: "plain index.html with no package.json (no build step required)",
+      packageManager,
     };
   }
 
   if (pkg?.scripts?.build) {
     return {
       framework: "GENERIC",
-      buildCommand: "npm run build",
+      buildCommand: runScript(packageManager, "build"),
       buildOutput: "dist",
       reason: "package.json with a build script, but no recognized framework config",
+      packageManager,
     };
   }
 
