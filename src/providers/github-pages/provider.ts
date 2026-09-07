@@ -198,6 +198,14 @@ export class GitHubPagesProvider implements DeploymentProvider {
     }
 
     deployment.status = "active";
+    // A prior create()/update() attempt on this same deployment record may
+    // have failed and left metadata.lastError set (create()'s catch block
+    // persists it deliberately, so a failed deployment doesn't vanish
+    // silently). Once we reach here the deployment is genuinely healthy —
+    // leaving that stale message in place would misrepresent an active,
+    // working deployment as having an outstanding error.
+    delete deployment.metadata.lastError;
+    delete deployment.metadata.lastErrorStep;
     return deployment;
   }
 

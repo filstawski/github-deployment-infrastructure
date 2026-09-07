@@ -5,7 +5,7 @@ describe("CLI argument parsing", () => {
   it("registers all commands required by the spec", () => {
     const names = program.commands.map((c) => c.name()).sort();
     expect(names).toEqual(
-      ["cleanup", "deploy", "destroy", "healthcheck", "list", "logs", "preview", "status", "update"].sort()
+      ["cleanup", "deploy", "destroy", "healthcheck", "list", "logs", "preview", "status", "update", "urls"].sort()
     );
   });
 
@@ -31,5 +31,10 @@ describe("CLI argument parsing", () => {
   it("exposes --ref on update for optional source-ref changes", () => {
     const cmd = program.commands.find((c) => c.name() === "update")!;
     expect(cmd.options.map((o) => o.long)).toContain("--ref");
+  });
+
+  it("exposes --all and --json on urls", () => {
+    const cmd = program.commands.find((c) => c.name() === "urls")!;
+    expect(cmd.options.map((o) => o.long)).toEqual(expect.arrayContaining(["--all", "--json"]));
   });
 });

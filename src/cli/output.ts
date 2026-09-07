@@ -36,6 +36,13 @@ export function renderPreviewTable(rows: Array<{ branch: string; deployment?: De
   return renderTable(headers, tableRows);
 }
 
+/** Table of just branch/status/URL — the "give me every live link" view (`gdi urls`). */
+export function renderUrlsTable(deployments: Deployment[]): string {
+  const headers = ["Branch", "Status", "URL"];
+  const rows = deployments.map((d) => [d.source.ref, d.status, d.urls.preview ?? "—"]);
+  return renderTable(headers, rows);
+}
+
 export function renderStatusTree(deployments: Deployment[]): string {
   const byProject = new Map<string, Deployment[]>();
   for (const d of deployments) {

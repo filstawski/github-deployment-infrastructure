@@ -15,7 +15,7 @@ import {
   updateDeployment,
   validateAccess,
 } from "../core/orchestrator.js";
-import { printJson, renderPreviewTable, renderStatusTree } from "./output.js";
+import { printJson, renderPreviewTable, renderStatusTree, renderUrlsTable } from "./output.js";
 import { formatRemaining } from "../core/ttl.js";
 import { generateDashboardHtml } from "../dashboard/generate.js";
 import { writeFileSync } from "node:fs";
@@ -208,6 +208,36 @@ program
         : deployments.forEach((d) =>
             console.log(`${d.id}  ${d.source.ref.padEnd(20)}  ${d.status.padEnd(10)}  ${d.urls.preview ?? "—"}`)
           );
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+program
+  .command("urls")
+  .description("List preview URLs for deployments (active ones only, by default).")
+  .option("--all", "Include non-active deployments (failed, expiring, destroyed, ...) too", false)
+  .option("--json", "Output machine-readable JSON", false)
+  .action(async (opts) => {
+    try {
+      const config = loadConfig();
+      const ctx = createContext(config);
+      const deployments = await (opts.all ? ctx.registry.list() : ctx.registry.listActive());
+      const sorted = [...deployments].sort((a, b) => a.source.ref.localeCompare(b.source.ref));
+
+      if (opts.json) {
+        printJson({
+          urls: sorted.map((d) => ({ id: d.id, branch: d.source.ref, status: d.status, url: d.urls.preview ?? null })),
+        });
+        return;
+      }
+
+      if (sorted.length === 0) {
+        console.log(opts.all ? "No deployments found." : "No active deployments found. Pass --all to include non-active ones.");
+        return;
+      }
+
+      console.log(renderUrlsTable(sorted));
     } catch (err) {
       handleError(err);
     }
