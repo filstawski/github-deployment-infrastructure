@@ -1,17 +1,43 @@
 {
   "name": "github-deployment-infrastructure",
   "version": "0.1.0",
-  "description": "Reusable ephemeral preview deployment platform, primarily backed by GitHub Pages.",
+  "description": "Reusable ephemeral preview deployment platform, primarily backed by GitHub Pages. Turn branches into short-lived, disposable preview URLs with automatic TTL-based cleanup.",
+  "keywords": [
+    "github-pages",
+    "preview-deployment",
+    "ephemeral",
+    "cli",
+    "claude-skill",
+    "ci-cd",
+    "static-site"
+  ],
   "license": "MIT",
+  "author": "Filip Surdic <filip@surdic.de>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/filstawski/github-deployment-infrastructure.git"
+  },
+  "homepage": "https://github.com/filstawski/github-deployment-infrastructure#readme",
+  "bugs": {
+    "url": "https://github.com/filstawski/github-deployment-infrastructure/issues"
+  },
   "type": "module",
   "bin": {
     "gdi": "./bin/gdi.js"
   },
+  "files": [
+    "dist",
+    "bin",
+    "templates",
+    "examples",
+    "SKILL.md"
+  ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build && npm test",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "tsc --noEmit -p tsconfig.json"
