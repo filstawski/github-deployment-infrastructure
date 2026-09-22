@@ -23,7 +23,7 @@
   },
   "type": "module",
   "bin": {
-    "gdi": "./bin/gdi.js"
+    "gdi": "bin/gdi.js"
   },
   "files": [
     "dist",
