@@ -139,6 +139,29 @@ export async function readJsonFile<T = unknown>(octokit: Octokit, owner: string,
   }
 }
 
+/** Overwrites an existing JSON file in place via the Contents API (one commit, no clone). */
+export async function writeJsonFile(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  path: string,
+  value: unknown,
+  message: string
+): Promise<void> {
+  const { data } = await octokit.repos.getContent({ owner, repo, path });
+  if (Array.isArray(data) || data.type !== "file") {
+    throw new ProviderError(`Expected ${path} in ${owner}/${repo} to be a file.`);
+  }
+  await octokit.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path,
+    message,
+    content: Buffer.from(JSON.stringify(value, null, 2) + "\n", "utf-8").toString("base64"),
+    sha: data.sha,
+  });
+}
+
 export async function listRecentWorkflowRuns(octokit: Octokit, owner: string, repo: string, perPage = 5) {
   const { data } = await octokit.actions.listWorkflowRunsForRepo({ owner, repo, per_page: perPage });
   return data.workflow_runs;

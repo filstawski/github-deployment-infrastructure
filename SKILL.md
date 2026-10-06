@@ -47,6 +47,7 @@ results directly to the user.
 gdi deploy --branch <branch> [--ttl 3d] [--force-new] [--dry-run] [--json]
 gdi preview <branch1> <branch2> ... [--ttl 3d] [--dashboard] [--dry-run] [--json]
 gdi update <deployment-id> [--ref <branch>] [--json]
+gdi extend <deployment-id> [--ttl 7d] [--json]
 gdi destroy <deployment-id> [--json]
 gdi status [deployment-id] [--json]
 gdi list [--json]
@@ -64,6 +65,7 @@ gdi healthcheck <deployment-id> [--json]
 | "Preview design/a, design/b, design/c for 3 days." | `gdi preview design/a design/b design/c --ttl 3d` |
 | "Give me previews for all design/* branches." | Enumerate matching local/remote branches yourself (e.g. `git branch -r | grep design/`), then call `gdi preview` with the resolved list. Confirm the branch list with the user first if it's large or ambiguous. |
 | "Redeploy the modern design." | Find the matching deployment via `gdi list --json` (match on `source.ref` or repository name), then `gdi update <id>`. |
+| "Keep that preview up another week." | Resolve the ID via `gdi list --json`, then `gdi extend <id> --ttl 7d`. The new expiry is *now + TTL* (not added to the old expiry), clamped to `cleanup.maximum_ttl`; report the resulting expiry date. If the output says it was left unchanged, the deployment already expires later than that. `gdi update` does **not** change expiry. |
 | "Show me all active previews." | `gdi status` (tree view with per-branch expiry) or `gdi urls` (flat list of just the links) — pick based on whether they want status detail or just URLs to share. `gdi list` shows everything, including expired/destroyed, with more per-row detail than either. |
 | "Give me a list of all the deployment URLs." | `gdi urls`. Add `--all` if they also want failed/expiring/destroyed ones, not just active. This is the direct answer to "what are all my live links right now" — don't hand-build this list yourself from `gdi list` output when this command exists. |
 | "Delete the editorial preview." | Resolve the ID via `gdi list --json`, confirm with the user which one you mean if there's ambiguity, then `gdi destroy <id>`. This is destructive — see Safety rules. |

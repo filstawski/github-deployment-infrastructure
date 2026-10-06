@@ -156,6 +156,21 @@ gdi update dep_01KXYZ --ref design/modern-v2   # also change the source ref
 ```
 
 Reuses the existing deployment repository — never creates a new one.
+`update` rebuilds but does not change the expiry; use `extend` for that.
+
+### Extending
+
+```bash
+gdi extend dep_01KXYZ             # expires <original TTL> from now
+gdi extend dep_01KXYZ --ttl 7d    # expires 7 days from now
+```
+
+Sets the expiry to *now + TTL*, keeping the same URL. The TTL is clamped to
+`cleanup.maximum_ttl` like any deploy, and an expiry is never shortened (if
+the deployment already outlives the requested window, nothing changes).
+The new expiry is written both to the local registry and to the deployment
+repo's `.gdi-deployment.json`, which is what scheduled cleanup reads; that
+commit is tagged `[skip ci]`, so no rebuild is triggered.
 
 ## 10. Destroying
 

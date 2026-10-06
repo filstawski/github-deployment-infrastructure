@@ -5,7 +5,7 @@ describe("CLI argument parsing", () => {
   it("registers all commands required by the spec", () => {
     const names = program.commands.map((c) => c.name()).sort();
     expect(names).toEqual(
-      ["cleanup", "deploy", "destroy", "healthcheck", "list", "logs", "preview", "status", "update", "urls"].sort()
+      ["cleanup", "deploy", "destroy", "extend", "healthcheck", "list", "logs", "preview", "status", "update", "urls"].sort()
     );
   });
 
