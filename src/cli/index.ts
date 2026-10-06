@@ -9,6 +9,7 @@ import {
   createContext,
   deployBranch,
   destroyDeployment,
+  extendDeployment,
   planDeploy,
   previewBranches,
   runCleanup,
@@ -143,6 +144,37 @@ program
       await validateAccess(config);
       const deployment = await updateDeployment(ctx, deploymentId, opts.ref);
       opts.json ? printJson({ deployment }) : console.log(`✓ Updated ${deployment.id}\n  ${deployment.urls.preview}`);
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+program
+  .command("extend")
+  .description("Push an active deployment's expiry out to now + TTL (clamped to cleanup.maximum_ttl).")
+  .argument("<deployment-id>", "Deployment ID")
+  .option("--ttl <ttl>", "New time-to-live from now, e.g. 7d (defaults to the deployment's original TTL)")
+  .option("--json", "Output machine-readable JSON", false)
+  .action(async (deploymentId: string, opts) => {
+    try {
+      const config = loadConfig();
+      const ctx = createContext(config);
+      await validateAccess(config);
+      const result = await extendDeployment(ctx, deploymentId, opts.ttl);
+      if (opts.json) {
+        printJson(result);
+        return;
+      }
+      const { deployment } = result;
+      const expires = `${new Date(deployment.lifecycle.expiresAt).toLocaleString()} (in ${formatRemaining(deployment.lifecycle.expiresAt)})`;
+      if (result.ttlClamped) {
+        console.log(`! Requested TTL exceeds cleanup.maximum_ttl; using ${result.ttl}.`);
+      }
+      console.log(
+        result.extended
+          ? `✓ Extended ${deployment.id}\n  ${deployment.urls.preview ?? deployment.urls.repository}\n  Expires: ${expires}`
+          : `- ${deployment.id} already expires later than now + ${result.ttl}; left unchanged.\n  Expires: ${expires}`
+      );
     } catch (err) {
       handleError(err);
     }

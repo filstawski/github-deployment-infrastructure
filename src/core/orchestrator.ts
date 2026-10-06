@@ -11,6 +11,7 @@ import { ConfigError, DeployFailedError, ProviderError } from "./errors.js";
 import { settleWithConcurrency } from "./concurrency.js";
 import { MANAGED_BY } from "./types.js";
 import { getCurrentSourceRepository } from "./git-context.js";
+import { computeExpiry, parseTtlMs } from "./ttl.js";
 
 export const DEFAULT_REGISTRY_PATH = join(".gdi", "registry.json");
 
@@ -147,6 +148,71 @@ export async function updateDeployment(ctx: OrchestratorContext, deploymentId: s
   const updated = await ctx.provider.update(deployment, { ref });
   await ctx.registry.save(updated);
   return updated;
+}
+
+export interface ExtendResult {
+  deployment: Deployment;
+  previousExpiresAt: string;
+  ttl: string;
+  ttlClamped: boolean;
+  /** False when the deployment already outlives the requested window; nothing was changed. */
+  extended: boolean;
+}
+
+/**
+ * Pushes a deployment's expiry out to `now + ttl`. The TTL is clamped to
+ * cleanup.maximum_ttl exactly like a fresh deploy, so each extension is a
+ * bounded, explicit renewal — never open-ended hosting (spec section 18).
+ * Never shortens an expiry; use `destroy` to end a deployment early.
+ */
+export async function extendDeployment(
+  ctx: OrchestratorContext,
+  deploymentId: string,
+  requestedTtl?: string,
+  now: Date = new Date()
+): Promise<ExtendResult> {
+  const deployment = await ctx.registry.getById(deploymentId);
+  if (!deployment) {
+    throw new ProviderError(`No deployment found with ID: ${deploymentId}`, {
+      suggestedAction: "Run `gdi list` to see known deployment IDs.",
+    });
+  }
+  if (deployment.status === "destroyed" || deployment.status === "destroying") {
+    throw new ProviderError(`Deployment ${deploymentId} has been destroyed and cannot be extended.`, {
+      deploymentId,
+      suggestedAction: `Create a new one with \`gdi deploy --branch ${deployment.source.ref}\`.`,
+    });
+  }
+
+  // Default to the deployment's own original TTL; registry entries
+  // reconstructed from the provider carry "unknown" there.
+  const fallbackTtl = isValidTtl(deployment.lifecycle.ttl) ? deployment.lifecycle.ttl : undefined;
+  const { ttl, clamped } = resolveTtl(requestedTtl ?? fallbackTtl, ctx.config);
+  const previousExpiresAt = deployment.lifecycle.expiresAt;
+  const expiresAt = computeExpiry(now, ttl);
+
+  if (expiresAt.getTime() <= new Date(previousExpiresAt).getTime()) {
+    return { deployment, previousExpiresAt, ttl, ttlClamped: clamped, extended: false };
+  }
+
+  if (!ctx.provider.extend) {
+    throw new ProviderError(`Provider "${ctx.provider.name}" does not support extending deployments.`, { deploymentId });
+  }
+  await ctx.provider.extend(deployment, expiresAt.toISOString());
+
+  deployment.lifecycle.expiresAt = expiresAt.toISOString();
+  deployment.lifecycle.extendedAt = now.toISOString();
+  await ctx.registry.save(deployment);
+  return { deployment, previousExpiresAt, ttl, ttlClamped: clamped, extended: true };
+}
+
+function isValidTtl(ttl: string): boolean {
+  try {
+    parseTtlMs(ttl);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function destroyDeployment(ctx: OrchestratorContext, deploymentId: string, reason = "requested by user"): Promise<Deployment> {

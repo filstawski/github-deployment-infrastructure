@@ -13,6 +13,7 @@ import {
   readJsonFile,
   repositoryExists,
   setTopics,
+  writeJsonFile,
 } from "./client.js";
 import { fetchSourceRef, prepareDeploymentContent, pushAsInitialCommit } from "./git-ops.js";
 import { generatePagesWorkflow } from "./workflow-templates.js";
@@ -245,6 +246,43 @@ export class GitHubPagesProvider implements DeploymentProvider {
     } as any);
     updated.metadata.version += 1;
     return updated;
+  }
+
+  /**
+   * Rewrites expires_at in the deployment repo's .gdi-deployment.json. That
+   * file — not the local registry — is what scheduled cleanup reads from a
+   * fresh checkout, so an extension that skipped it would still be deleted
+   * at the old expiry. "[skip ci]" keeps the commit from triggering a rebuild.
+   */
+  async extend(deployment: Deployment, expiresAt: string): Promise<void> {
+    const { owner, repository } = deployment.target;
+    if (!(await repositoryExists(this.octokit, owner, repository))) {
+      throw new ProviderError(`Deployment repository ${owner}/${repository} no longer exists.`, {
+        deploymentId: deployment.id,
+        suggestedAction: "It was probably already cleaned up. Create a new deployment with `gdi deploy`.",
+      });
+    }
+    const topics = await getRepoTopics(this.octokit, owner, repository);
+    if (!isManagedRepository({ topics })) {
+      throw new ProviderError(`Refusing to modify ${owner}/${repository}: it is missing the managed-by topic marker.`, {
+        deploymentId: deployment.id,
+      });
+    }
+    const metadata = await readJsonFile<Record<string, unknown>>(this.octokit, owner, repository, ".gdi-deployment.json");
+    if (!metadata || metadata.deployment_id !== deployment.id) {
+      throw new ProviderError(`${owner}/${repository} has no .gdi-deployment.json for deployment ${deployment.id}.`, {
+        deploymentId: deployment.id,
+        suggestedAction: `Run \`gdi update ${deployment.id}\` to republish the metadata, then retry.`,
+      });
+    }
+    await writeJsonFile(
+      this.octokit,
+      owner,
+      repository,
+      ".gdi-deployment.json",
+      { ...metadata, expires_at: expiresAt },
+      `Extend ${deployment.id} until ${expiresAt} [skip ci]`
+    );
   }
 
   async destroy(deployment: Deployment): Promise<void> {

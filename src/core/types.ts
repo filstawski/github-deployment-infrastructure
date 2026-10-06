@@ -79,6 +79,7 @@ export interface DeploymentLifecycle {
   createdAt: string;
   expiresAt: string;
   ttl: string;
+  extendedAt?: string;
   destroyedAt?: string;
   destroyReason?: string;
 }
@@ -173,6 +174,13 @@ export interface DeploymentProvider {
    * independently of Claude [or a developer machine]").
    */
   listManaged?(owner: string): Promise<Deployment[]>;
+  /**
+   * Optional: persists a new expiry wherever the provider's own cleanup
+   * discovery reads it (for GitHub Pages, the deployment repo's metadata
+   * file), so an extension survives cleanup runs that never see the local
+   * registry.
+   */
+  extend?(deployment: Deployment, expiresAt: string): Promise<void>;
 }
 
 export const MANAGED_BY = "github-deployment-infrastructure";
