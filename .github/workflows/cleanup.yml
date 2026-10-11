@@ -26,10 +26,14 @@ jobs:
         with:
           node-version: "20"
 
+      # Install outside the workspace. This repo's package.json exposes a
+      # `gdi` bin that imports gitignored dist/, so any npx/npm-exec form
+      # (including `--package`) still resolves the local unbuilt binary —
+      # or, on the Node 20 npm that Actions ships, fails with `gdi: not found`.
       - name: Install github-deployment-infrastructure
-        run: npm install --no-save github-deployment-infrastructure
+        run: npm install --prefix "$RUNNER_TEMP/gdi-cli" github-deployment-infrastructure
 
       - name: Run cleanup
         env:
           GITHUB_TOKEN: ${{ secrets.GDI_GITHUB_TOKEN }}
-        run: npx gdi cleanup
+        run: node "$RUNNER_TEMP/gdi-cli/node_modules/github-deployment-infrastructure/bin/gdi.js" cleanup

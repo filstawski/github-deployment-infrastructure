@@ -161,4 +161,15 @@ describe("committed workflow files", () => {
     expect(parsed.on.schedule[0].cron).toBeTruthy();
     expect(parsed.jobs.cleanup).toBeDefined();
   });
+
+  it("cleanup.yml invokes the published CLI from an isolated prefix, not npx", () => {
+    const parsed = yaml.load(readFileSync(new URL("../.github/workflows/cleanup.yml", import.meta.url), "utf-8")) as any;
+    const runSteps = parsed.jobs.cleanup.steps
+      .filter((step: { run?: string }) => typeof step.run === "string")
+      .map((step: { run: string }) => step.run);
+    expect(runSteps.some((run: string) => run.includes('npm install --prefix "$RUNNER_TEMP/gdi-cli"'))).toBe(true);
+    const cleanupCmd = runSteps.find((run: string) => run.includes("cleanup"));
+    expect(cleanupCmd).toContain("$RUNNER_TEMP/gdi-cli/node_modules/github-deployment-infrastructure/bin/gdi.js");
+    expect(runSteps.join("\n")).not.toMatch(/\bnpx\b/);
+  });
 });
